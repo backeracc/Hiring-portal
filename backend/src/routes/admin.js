@@ -7,7 +7,9 @@ import User from '../models/User.js';
 import { sendShortlistedEmail } from '../lib/mailer.js';
 import EmployeeProgress from '../models/EmployeeProgress.js';
 import Department from '../models/Department.js';
+import AboutStat from '../models/AboutStat.js';
 import { v2 as cloudinary } from 'cloudinary';
+import multer from 'multer';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -17,6 +19,39 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 const router = express.Router();
+
+// Configure multer for image uploads (memory storage)
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
+// Helper: stream image buffer to Cloudinary
+const uploadImageToCloudinary = (buffer, originalName) => {
+  return new Promise((resolve, reject) => {
+    const safeName = (originalName || 'image').replace(/\s+/g, '_');
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'about_stats',
+        use_filename: true,
+        unique_filename: true,
+        public_id: `stat_${Date.now()}_${safeName.split('.')[0]}`,
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+};
 
 // Helper: resolve a job by MongoDB _id OR custom string id field
 const findJobByAnyId = async (paramId, session = null) => {
@@ -475,6 +510,26 @@ router.patch('/applications/:id', async (req, res) => {
   }
 });
 
+// DELETE /api/admin/applications/:id - Delete an application
+router.delete('/applications/:id', async (req, res) => {
+  try {
+    const appId = req.params.id;
+    const app = await findApplicationByAnyId(appId);
+    
+    if (!app) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    await Application.findByIdAndDelete(app._id);
+    await EmployeeProgress.deleteOne({ applicationId: app._id });
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error deleting application:', error);
+    res.status(500).json({ error: 'Failed to delete application' });
+  }
+});
+
 // GET /api/admin/applications/:id/resume - Serves candidate resume
 router.get('/applications/:id/resume', async (req, res) => {
   try {
@@ -715,6 +770,41 @@ router.get('/departments', async (req, res) => {
   }
 });
 
+// ── GET /api/admin/departments/all ─ Get all department objects ─────────────
+router.get('/departments/all', async (req, res) => {
+  try {
+    const departments = await Department.find({}).sort({ name: 1 });
+    res.json(departments);
+  } catch (error) {
+    console.error('Error fetching departments objects:', error);
+    res.status(500).json({ error: 'Failed to fetch departments objects' });
+  }
+});
+
+// ── POST /api/admin/departments/:name/image ─ Upload category image ─────────
+router.post('/departments/:name/image', imageUpload.single('image'), async (req, res) => {
+  try {
+    const { name } = req.params;
+    let department = await Department.findOne({ name });
+    
+    if (!department) {
+      department = new Department({ name });
+    }
+
+    if (req.file) {
+      const result = await uploadImageToCloudinary(req.file.buffer, req.file.originalname);
+      department.image = result.secure_url;
+      await department.save();
+      return res.json({ success: true, image: department.image });
+    }
+    
+    return res.status(400).json({ error: 'No image provided' });
+  } catch (error) {
+    console.error('Error uploading category image:', error);
+    res.status(500).json({ error: 'Failed to upload category image' });
+  }
+});
+
 // POST /api/admin/departments/manage - Manage departments (add, edit, delete)
 router.post('/departments/manage', async (req, res) => {
   try {
@@ -926,6 +1016,93 @@ router.post('/system/sync', async (req, res) => {
   } catch (error) {
     console.error('Error in system sync:', error);
     res.status(500).json({ error: 'Failed to sync system data' });
+  }
+});
+
+// ── GET /api/admin/about-stats ─ Get all stats ─────────────────────────────────────
+router.get('/about-stats', async (req, res) => {
+  try {
+    const stats = await AboutStat.find({}).sort({ order: 1 });
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching about stats:', error);
+    res.status(500).json({ error: 'Failed to fetch about stats' });
+  }
+});
+
+// ── POST /api/admin/about-stats ─ Create a new stat ─────────────────────────────────
+router.post('/about-stats', imageUpload.single('image'), async (req, res) => {
+  try {
+    const { value, label, imageHeight, imagePosition, order } = req.body;
+    let imageUrl = '';
+
+    if (req.file) {
+      const result = await uploadImageToCloudinary(req.file.buffer, req.file.originalname);
+      imageUrl = result.secure_url;
+    } else {
+      return res.status(400).json({ error: 'Image is required' });
+    }
+
+    const newStat = new AboutStat({
+      value,
+      label,
+      image: imageUrl,
+      imageHeight: imageHeight || '',
+      imagePosition: imagePosition || '',
+      order: order ? parseInt(order, 10) : 0,
+    });
+
+    await newStat.save();
+    res.status(201).json(newStat);
+  } catch (error) {
+    console.error('Error creating about stat:', error);
+    res.status(500).json({ error: 'Failed to create about stat' });
+  }
+});
+
+// ── PUT /api/admin/about-stats/:id ─ Update a stat ──────────────────────────────────
+router.put('/about-stats/:id', imageUpload.single('image'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { value, label, imageHeight, imagePosition, order } = req.body;
+
+    const stat = await AboutStat.findById(id);
+    if (!stat) return res.status(404).json({ error: 'Stat not found' });
+
+    stat.value = value || stat.value;
+    stat.label = label || stat.label;
+    if (imageHeight !== undefined) stat.imageHeight = imageHeight;
+    if (imagePosition !== undefined) stat.imagePosition = imagePosition;
+    if (order !== undefined) stat.order = parseInt(order, 10);
+
+    // If there's a new file, upload it and update image URL
+    if (req.file) {
+      const result = await uploadImageToCloudinary(req.file.buffer, req.file.originalname);
+      stat.image = result.secure_url;
+      // Optional: Delete old image from Cloudinary here to save space
+    }
+
+    await stat.save();
+    res.json(stat);
+  } catch (error) {
+    console.error('Error updating about stat:', error);
+    res.status(500).json({ error: 'Failed to update about stat' });
+  }
+});
+
+// ── DELETE /api/admin/about-stats/:id ─ Delete a stat ───────────────────────────────
+router.delete('/about-stats/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const stat = await AboutStat.findByIdAndDelete(id);
+    if (!stat) return res.status(404).json({ error: 'Stat not found' });
+    
+    // Optional: Delete image from Cloudinary here
+
+    res.json({ success: true, message: 'Stat deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting about stat:', error);
+    res.status(500).json({ error: 'Failed to delete about stat' });
   }
 });
 

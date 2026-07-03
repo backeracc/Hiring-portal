@@ -1,12 +1,40 @@
 import mongoose from 'mongoose';
 
-const aboutStatSchema = new mongoose.Schema({
-  value: { type: String, required: true },
-  label: { type: String, required: true },
-  image: { type: String, required: true },
-  imageHeight: { type: String, default: null },
-  imagePosition: { type: String, default: null },
-  order: { type: Number, default: 0 }
-}, { timestamps: true });
+const aboutStatSchema = new mongoose.Schema(
+  {
+    value: {
+      type: String,
+      required: true,
+    },
+    label: {
+      type: String,
+      required: true,
+    },
+    image: {
+      type: String,
+      required: true,
+    },
+    imageHeight: {
+      type: String,
+      default: '',
+    },
+    imagePosition: {
+      type: String,
+      default: '',
+    },
+    order: {
+      type: Number,
+      required: true,
+      default: 0,
+    }
+  },
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
 
-export default mongoose.models.AboutStat || mongoose.model('AboutStat', aboutStatSchema);
+const AboutStat = mongoose.model('AboutStat', aboutStatSchema);
+
+export default AboutStat;
