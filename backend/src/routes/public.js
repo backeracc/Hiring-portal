@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import Job from '../models/Job.js';
 import Application from '../models/Application.js';
+import AboutStat from '../models/AboutStat.js';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import dotenv from 'dotenv';
@@ -16,6 +17,17 @@ cloudinary.config({
 });
 
 const router = express.Router();
+
+// ── GET About Stats ──────────────────────────────────────────────────────────
+router.get('/about-stats', async (req, res) => {
+  try {
+    const stats = await AboutStat.find().sort({ order: 1 });
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching about stats:', error);
+    res.status(500).json({ error: 'Failed to fetch about stats' });
+  }
+});
 
 // 10 MB file size limit, memory storage for Cloudinary streaming
 const upload = multer({

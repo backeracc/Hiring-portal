@@ -58,7 +58,7 @@ const DEPARTMENTS: { key: string; label: string }[] = [
   { key: "UI/UX Design",       label: "UI/UX Design"        },
 ];
 
-const STATS = [
+const INITIAL_STATS = [
   { value: "12+",  label: "Interns Onboarded",    image: "/internships.jpg" },
   { value: "40%",  label: "Convert to Full-time", image: "/Convert to Full time.jpg" },
   { value: "19+",  label: "Roles Open",           image: "/Opening-roles.jpg" },
@@ -1485,8 +1485,8 @@ function HomePage({
 
           {/* Right – stats only */}
           <div className="grid grid-cols-2 gap-4">
-            {STATS.map((stat) => (
-              <div key={stat.label} className="rounded-2xl border p-5" style={{ borderColor: CREAM_BORDER, backgroundColor: CREAM }}>
+            {aboutStats.map((stat, i) => (
+              <div key={stat.label || i} className="rounded-2xl border p-5" style={{ borderColor: CREAM_BORDER, backgroundColor: CREAM }}>
                 <img
                   src={stat.image}
                   alt={stat.label}
@@ -1538,6 +1538,7 @@ export default function App() {
   const [selectedJob,   setSelectedJob]   = useState<JobDetail | null>(null);
   const [showApply,     setShowApply]     = useState(false);
   const [backendJobs,   setBackendJobs]   = useState<JobDetail[]>([]);
+  const [aboutStats,    setAboutStats]    = useState<any[]>(INITIAL_STATS);
 
   useEffect(() => {
     fetch("/api/public/jobs")
@@ -1566,6 +1567,15 @@ export default function App() {
         }
       })
       .catch((err) => console.error("Error fetching jobs:", err));
+
+    fetch("/api/public/about-stats")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAboutStats(data);
+        }
+      })
+      .catch((err) => console.error("Error fetching about stats:", err));
   }, []);
 
   useEffect(() => {
