@@ -647,7 +647,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
       if (res.ok && data.success) {
         setPhoneOtpSent(true);
       } else {
-        setPhoneOtpError(data.error || "Failed to send SMS OTP.");
+        setPhoneOtpError(data.detail || data.error || "Failed to send SMS OTP.");
       }
     } catch (error: any) {
       setPhoneOtpError("Network error. Please try again.");

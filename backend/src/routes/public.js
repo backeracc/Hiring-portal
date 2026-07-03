@@ -328,7 +328,7 @@ router.post('/send-phone-otp', async (req, res) => {
         body: JSON.stringify({
           variables_values: otp,
           route: 'otp',
-          numbers: phone.replace(/\D/g, '') // strip non-numeric (e.g. +91 to 91)
+          numbers: phone.replace(/\D/g, '').slice(-10) // Always take the last 10 digits for Fast2SMS
         })
       });
       
