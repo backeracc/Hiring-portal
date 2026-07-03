@@ -601,12 +601,14 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
   const [phoneOtpVerified, setPhoneOtpVerified] = useState(false);
   const [phoneOtpError, setPhoneOtpError] = useState("");
   const [phoneConfirmationResult, setPhoneConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [isSendingPhone, setIsSendingPhone] = useState(false);
 
   const [email, setEmail] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailOtpVerified, setEmailOtpVerified] = useState(false);
   const [emailOtpError, setEmailOtpError] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // Application details state
   const [form, setForm] = useState({
@@ -644,6 +646,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
   const handleSendPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone) return;
+    setIsSendingPhone(true);
     try {
       setPhoneOtpError("");
       setupRecaptcha();
@@ -654,6 +657,8 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
     } catch (error: any) {
       console.error(error);
       setPhoneOtpError(error.message || "Failed to send SMS OTP.");
+    } finally {
+      setIsSendingPhone(false);
     }
   };
 
@@ -672,6 +677,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
   const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
+    setIsSendingEmail(true);
     try {
       setEmailOtpError("");
       const res = await fetch('/api/public/send-email-otp', {
@@ -687,6 +693,8 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
       }
     } catch (error: any) {
       setEmailOtpError("Network error. Please try again.");
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -866,12 +874,14 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
                       {!emailOtpVerified && (
                         <button
                           type="submit"
-                          className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95 hover:brightness-95"
+                          disabled={isSendingEmail}
+                          className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95 hover:brightness-95 disabled:opacity-50"
                           style={{ backgroundColor: GOLD, color: TEXT_DARK }}
                         >
-                          {emailOtpSent ? "Resend Email OTP" : "Send Email OTP"}
+                          {isSendingEmail ? "Sending..." : emailOtpSent ? "Resend Email OTP" : "Send Email OTP"}
                         </button>
                       )}
+                      {emailOtpError && !emailOtpSent && <p className="text-xs font-semibold text-red-600">{emailOtpError}</p>}
                     </div>
                   </Field>
                 </form>
@@ -934,12 +944,14 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
                       {!phoneOtpVerified && (
                         <button
                           type="submit"
-                          className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95 hover:brightness-95"
+                          disabled={isSendingPhone}
+                          className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95 hover:brightness-95 disabled:opacity-50"
                           style={{ backgroundColor: GOLD, color: TEXT_DARK }}
                         >
-                          {phoneOtpSent ? "Resend SMS OTP" : "Send SMS OTP"}
+                          {isSendingPhone ? "Sending..." : phoneOtpSent ? "Resend SMS OTP" : "Send SMS OTP"}
                         </button>
                       )}
+                      {phoneOtpError && !phoneOtpSent && <p className="text-xs font-semibold text-red-600">{phoneOtpError}</p>}
                     </div>
                   </Field>
                 </form>
