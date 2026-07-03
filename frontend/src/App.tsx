@@ -4,6 +4,8 @@ import {
   MapPin, ArrowRight,
   ArrowLeft, CheckCircle2, X, Upload,
 } from "lucide-react";
+import { auth } from './firebaseConfig';
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { JOB_DETAILS, type JobDetail } from "./jobData";
 
 /* ─── Brand Colors ─── */
@@ -590,7 +592,7 @@ interface SelectionProcessPageProps {
 }
 
 function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
-  const [step, setStep] = useState<"mobile" | "email" | "details" | "legal">("mobile");
+  const [step, setStep] = useState<"verification" | "details" | "legal">("verification");
   
   // Verification states
   const [phone, setPhone] = useState("");
@@ -598,14 +600,13 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [phoneOtpVerified, setPhoneOtpVerified] = useState(false);
   const [phoneOtpError, setPhoneOtpError] = useState("");
-  const [showPhoneMockTooltip, setShowPhoneMockTooltip] = useState(false);
+  const [phoneConfirmationResult, setPhoneConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   const [email, setEmail] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailOtpVerified, setEmailOtpVerified] = useState(false);
   const [emailOtpError, setEmailOtpError] = useState("");
-  const [showEmailMockTooltip, setShowEmailMockTooltip] = useState(false);
 
   // Application details state
   const [form, setForm] = useState({
@@ -632,41 +633,80 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
 
   const isUnpaid = job.compensation?.toLowerCase() === "unpaid";
 
-  const handleSendPhoneOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone) return;
-    setPhoneOtpSent(true);
-    setShowPhoneMockTooltip(true);
-    setPhoneOtpError("");
-  };
-
-  const handleVerifyPhoneOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (phoneOtp === "123456") {
-      setPhoneOtpVerified(true);
-      setPhoneOtpError("");
-      setShowPhoneMockTooltip(false);
-    } else {
-      setPhoneOtpError("Invalid OTP. For testing, use 123456.");
+  const setupRecaptcha = () => {
+    if (!(window as any).recaptchaVerifier) {
+      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible'
+      });
     }
   };
 
-  const handleSendEmailOtp = (e: React.FormEvent) => {
+  const handleSendPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
-    setEmailOtpSent(true);
-    setShowEmailMockTooltip(true);
-    setEmailOtpError("");
+    if (!phone) return;
+    try {
+      setPhoneOtpError("");
+      setupRecaptcha();
+      const appVerifier = (window as any).recaptchaVerifier;
+      const confirmationResult = await signInWithPhoneNumber(auth, phone, appVerifier);
+      setPhoneConfirmationResult(confirmationResult);
+      setPhoneOtpSent(true);
+    } catch (error: any) {
+      console.error(error);
+      setPhoneOtpError(error.message || "Failed to send SMS OTP.");
+    }
   };
 
-  const handleVerifyEmailOtp = (e: React.FormEvent) => {
+  const handleVerifyPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (emailOtp === "654321") {
-      setEmailOtpVerified(true);
+    if (!phoneConfirmationResult) return;
+    try {
+      await phoneConfirmationResult.confirm(phoneOtp);
+      setPhoneOtpVerified(true);
+      setPhoneOtpError("");
+    } catch (error: any) {
+      setPhoneOtpError("Invalid OTP or expired.");
+    }
+  };
+
+  const handleSendEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    try {
       setEmailOtpError("");
-      setShowEmailMockTooltip(false);
-    } else {
-      setEmailOtpError("Invalid OTP. For testing, use 654321.");
+      const res = await fetch('/api/public/send-email-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEmailOtpSent(true);
+      } else {
+        setEmailOtpError(data.error || "Failed to send Email OTP.");
+      }
+    } catch (error: any) {
+      setEmailOtpError("Network error. Please try again.");
+    }
+  };
+
+  const handleVerifyEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/public/verify-email-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp: emailOtp })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEmailOtpVerified(true);
+        setEmailOtpError("");
+      } else {
+        setEmailOtpError(data.error || "Invalid OTP.");
+      }
+    } catch (error: any) {
+      setEmailOtpError("Network error. Please try again.");
     }
   };
 
@@ -732,8 +772,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
   };
 
   const steps = [
-    { id: "mobile", label: "Mobile Verification" },
-    { id: "email", label: "Email Verification" },
+    { id: "verification", label: "Dual Verification" },
     { id: "details", label: "Application Details" },
     { id: "legal", label: "Legal Notice" },
   ];
@@ -763,8 +802,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
           {steps.map((s, idx) => {
             const isActive = step === s.id;
             const isCompleted = 
-              (s.id === "mobile" && (phoneOtpVerified || step === "email" || step === "details" || step === "legal")) ||
-              (s.id === "email" && (emailOtpVerified || step === "details" || step === "legal")) ||
+              (s.id === "verification" && (step === "details" || step === "legal")) ||
               (s.id === "details" && step === "legal");
             
             return (
@@ -798,171 +836,162 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
           })}
         </div>
 
-        {/* Step 1: Mobile Verification */}
-        {step === "mobile" && (
-          <div className="w-full p-10 rounded-2xl border bg-white" style={{ borderColor: CREAM_BORDER }}>
-            <h2 className="text-lg font-extrabold mb-4" style={{ color: TEXT_DARK }}>Step 1: Mobile Verification</h2>
+        {/* Step 1: Dual Verification */}
+        {step === "verification" && (
+          <div className="w-full p-6 md:p-10 rounded-2xl border bg-white" style={{ borderColor: CREAM_BORDER }}>
+            <h2 className="text-lg font-extrabold mb-8 text-center" style={{ color: TEXT_DARK }}>Step 1: Contact Verification</h2>
+            <div id="recaptcha-container"></div>
             
-            <form onSubmit={handleSendPhoneOtp} className="space-y-4">
-              <Field label="Mobile Number">
-                <div className="flex gap-2">
-                  <input
-                    type="tel"
-                    required
-                    disabled={phoneOtpVerified}
-                    placeholder="Enter 10-digit mobile number"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className={fieldBase}
-                    style={fieldStyle}
-                    onFocus={focusField}
-                    onBlur={blurField}
-                  />
-                  {!phoneOtpVerified && (
-                    <button
-                      type="submit"
-                      className="px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all active:scale-95 hover:brightness-95 cursor-pointer"
-                      style={{ backgroundColor: GOLD, color: TEXT_DARK }}
-                    >
-                      {phoneOtpSent ? "Resend OTP" : "Send OTP"}
-                    </button>
-                  )}
-                </div>
-              </Field>
-            </form>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+              
+              {/* Left Column: Email Verification */}
+              <div className="flex flex-col space-y-4">
+                <h3 className="font-bold text-md border-b pb-2" style={{ color: TEXT_DARK, borderColor: CREAM_BORDER }}>Email Address</h3>
+                
+                <form onSubmit={handleSendEmailOtp} className="space-y-4">
+                  <Field label="Email">
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="email"
+                        required
+                        disabled={emailOtpVerified}
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className={fieldBase}
+                        style={fieldStyle}
+                        onFocus={focusField}
+                        onBlur={blurField}
+                      />
+                      {!emailOtpVerified && (
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95 hover:brightness-95"
+                          style={{ backgroundColor: GOLD, color: TEXT_DARK }}
+                        >
+                          {emailOtpSent ? "Resend Email OTP" : "Send Email OTP"}
+                        </button>
+                      )}
+                    </div>
+                  </Field>
+                </form>
 
-            {phoneOtpSent && !phoneOtpVerified && (
-              <form onSubmit={handleVerifyPhoneOtp} className="mt-6 space-y-4">
-                {showPhoneMockTooltip && (
-                  <div className="p-3 rounded-lg text-xs leading-relaxed" style={{ backgroundColor: CREAM, border: `1px solid ${CREAM_BORDER}`, color: TEXT_DARK }}>
-                    ✨ <strong>Demo Helper:</strong> We simulated sending an OTP code. Please use <strong>123456</strong>.
+                {emailOtpSent && !emailOtpVerified && (
+                  <form onSubmit={handleVerifyEmailOtp} className="space-y-4 pt-2">
+                    <Field label="Enter OTP from Email">
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          required
+                          maxLength={6}
+                          placeholder="6-digit OTP"
+                          value={emailOtp}
+                          onChange={(e) => setEmailOtp(e.target.value)}
+                          className={fieldBase}
+                          style={fieldStyle}
+                          onFocus={focusField}
+                          onBlur={blurField}
+                        />
+                        {emailOtpError && <p className="text-xs font-semibold text-red-600">{emailOtpError}</p>}
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 rounded-lg font-bold text-sm transition-all active:scale-95 hover:brightness-95"
+                          style={{ backgroundColor: GOLD_DARK, color: "#fff" }}
+                        >
+                          Verify Email
+                        </button>
+                      </div>
+                    </Field>
+                  </form>
+                )}
+
+                {emailOtpVerified && (
+                  <div className="p-3.5 rounded-lg flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm font-medium mt-2">
+                    <span className="text-lg">✓</span> Email verified!
                   </div>
                 )}
-                <Field label="Enter OTP Code">
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    placeholder="Enter 6-digit OTP"
-                    value={phoneOtp}
-                    onChange={(e) => setPhoneOtp(e.target.value)}
-                    className={fieldBase}
-                    style={fieldStyle}
-                    onFocus={focusField}
-                    onBlur={blurField}
-                  />
-                </Field>
-                {phoneOtpError && (
-                  <p className="text-xs font-semibold text-red-600">{phoneOtpError}</p>
-                )}
-                <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-lg font-bold text-sm transition-all active:scale-95 hover:brightness-95"
-                  style={{ backgroundColor: GOLD_DARK, color: "#fff" }}
-                >
-                  Verify Mobile Number
-                </button>
-              </form>
-            )}
-
-            {phoneOtpVerified && (
-              <div className="mt-6 space-y-4">
-                <div className="p-3.5 rounded-lg flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm font-medium">
-                  <span className="text-lg">✓</span> Mobile number verified successfully!
-                </div>
-                <button
-                  onClick={() => setStep("email")}
-                  className="w-full py-2.5 rounded-lg font-bold text-sm transition-all active:scale-95 hover:brightness-95 flex items-center justify-center gap-1"
-                  style={{ backgroundColor: GOLD, color: TEXT_DARK }}
-                >
-                  Go to Next Step <ArrowRight className="w-4 h-4" />
-                </button>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* Step 2: Email Verification */}
-        {step === "email" && (
-          <div className="w-full p-10 rounded-2xl border bg-white" style={{ borderColor: CREAM_BORDER }}>
-            <h2 className="text-lg font-extrabold mb-4" style={{ color: TEXT_DARK }}>Step 2: Email Verification</h2>
-            
-            <form onSubmit={handleSendEmailOtp} className="space-y-4">
-              <Field label="Email Address">
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    required
-                    disabled={emailOtpVerified}
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={fieldBase}
-                    style={fieldStyle}
-                    onFocus={focusField}
-                    onBlur={blurField}
-                  />
-                  {!emailOtpVerified && (
-                    <button
-                      type="submit"
-                      className="px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all active:scale-95 hover:brightness-95 cursor-pointer"
-                      style={{ backgroundColor: GOLD, color: TEXT_DARK }}
-                    >
-                      {emailOtpSent ? "Resend OTP" : "Send OTP"}
-                    </button>
-                  )}
-                </div>
-              </Field>
-            </form>
+              {/* Right Column: Mobile Verification */}
+              <div className="flex flex-col space-y-4">
+                <h3 className="font-bold text-md border-b pb-2" style={{ color: TEXT_DARK, borderColor: CREAM_BORDER }}>Mobile Number</h3>
+                
+                <form onSubmit={handleSendPhoneOtp} className="space-y-4">
+                  <Field label="Phone">
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="tel"
+                        required
+                        disabled={phoneOtpVerified}
+                        placeholder="+1 234 567 8900"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className={fieldBase}
+                        style={fieldStyle}
+                        onFocus={focusField}
+                        onBlur={blurField}
+                      />
+                      {!phoneOtpVerified && (
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all active:scale-95 hover:brightness-95"
+                          style={{ backgroundColor: GOLD, color: TEXT_DARK }}
+                        >
+                          {phoneOtpSent ? "Resend SMS OTP" : "Send SMS OTP"}
+                        </button>
+                      )}
+                    </div>
+                  </Field>
+                </form>
 
-            {emailOtpSent && !emailOtpVerified && (
-              <form onSubmit={handleVerifyEmailOtp} className="mt-6 space-y-4">
-                {showEmailMockTooltip && (
-                  <div className="p-3 rounded-lg text-xs leading-relaxed" style={{ backgroundColor: CREAM, border: `1px solid ${CREAM_BORDER}`, color: TEXT_DARK }}>
-                    ✨ <strong>Demo Helper:</strong> We simulated sending an OTP code. Please use <strong>654321</strong>.
+                {phoneOtpSent && !phoneOtpVerified && (
+                  <form onSubmit={handleVerifyPhoneOtp} className="space-y-4 pt-2">
+                    <Field label="Enter OTP from SMS">
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          required
+                          maxLength={6}
+                          placeholder="6-digit OTP"
+                          value={phoneOtp}
+                          onChange={(e) => setPhoneOtp(e.target.value)}
+                          className={fieldBase}
+                          style={fieldStyle}
+                          onFocus={focusField}
+                          onBlur={blurField}
+                        />
+                        {phoneOtpError && <p className="text-xs font-semibold text-red-600">{phoneOtpError}</p>}
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 rounded-lg font-bold text-sm transition-all active:scale-95 hover:brightness-95"
+                          style={{ backgroundColor: GOLD_DARK, color: "#fff" }}
+                        >
+                          Verify Mobile
+                        </button>
+                      </div>
+                    </Field>
+                  </form>
+                )}
+
+                {phoneOtpVerified && (
+                  <div className="p-3.5 rounded-lg flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm font-medium mt-2">
+                    <span className="text-lg">✓</span> Mobile verified!
                   </div>
                 )}
-                <Field label="Enter OTP Code">
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    placeholder="Enter 6-digit OTP"
-                    value={emailOtp}
-                    onChange={(e) => setEmailOtp(e.target.value)}
-                    className={fieldBase}
-                    style={fieldStyle}
-                    onFocus={focusField}
-                    onBlur={blurField}
-                  />
-                </Field>
-                {emailOtpError && (
-                  <p className="text-xs font-semibold text-red-600">{emailOtpError}</p>
-                )}
-                <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-lg font-bold text-sm transition-all active:scale-95 hover:brightness-95"
-                  style={{ backgroundColor: GOLD_DARK, color: "#fff" }}
-                >
-                  Verify Email
-                </button>
-              </form>
-            )}
-
-            {emailOtpVerified && (
-              <div className="mt-6 space-y-4">
-                <div className="p-3.5 rounded-lg flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm font-medium">
-                  <span className="text-lg">✓</span> Email verified successfully!
-                </div>
-                <button
-                  onClick={() => setStep("details")}
-                  className="w-full py-2.5 rounded-lg font-bold text-sm transition-all active:scale-95 hover:brightness-95 flex items-center justify-center gap-1"
-                  style={{ backgroundColor: GOLD, color: TEXT_DARK }}
-                >
-                  Go to Next Step <ArrowRight className="w-4 h-4" />
-                </button>
               </div>
-            )}
+            </div>
+
+            {/* Next Step Action */}
+            <div className="mt-12 pt-6 border-t flex justify-center" style={{ borderColor: CREAM_BORDER }}>
+              <button
+                onClick={() => setStep("details")}
+                disabled={!emailOtpVerified || !phoneOtpVerified}
+                className="w-full md:w-1/2 py-3.5 rounded-full font-bold text-sm transition-all active:scale-95 hover:brightness-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: GOLD, color: TEXT_DARK }}
+              >
+                Proceed to Application Details <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -1108,7 +1137,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setStep("email")}
+                    onClick={() => setStep("verification")}
                     className="w-1/3 py-3 rounded-full font-bold text-sm transition-all active:scale-95 hover:bg-gray-50 border flex items-center justify-center gap-1"
                     style={{ borderColor: CREAM_BORDER, color: TEXT_DARK }}
                   >

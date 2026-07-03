@@ -5,6 +5,7 @@ import Application from '../models/Application.js';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import dotenv from 'dotenv';
+import nodemailer from 'nodemailer';
 dotenv.config();
 
 // Configure cloudinary
@@ -194,6 +195,107 @@ router.post('/apply', upload.single('resume'), async (req, res) => {
   } catch (error) {
     console.error('[Apply] Error:', error);
     res.status(500).json({ error: 'Failed to submit application', detail: error.message });
+  }
+});
+
+// ── Email OTP Endpoints ───────────────────────────────────────────────────────
+
+// In-memory store for OTPs (email -> { otp, expiresAt })
+// Note: For a production app, use Redis or MongoDB for this.
+const otpStore = new Map();
+
+// Helper to create mail transporter
+const getTransporter = async () => {
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  } else {
+    // Fallback to Ethereal dummy account for testing if no SMTP config is provided
+    let testAccount = await nodemailer.createTestAccount();
+    return nodemailer.createTransport({
+      host: "smtp.ethereal.email",
+      port: 587,
+      secure: false, 
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass,
+      },
+    });
+  }
+};
+
+router.post('/send-email-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store OTP with 10 minute expiration
+    otpStore.set(email, {
+      otp,
+      expiresAt: Date.now() + 10 * 60 * 1000 
+    });
+
+    // Send Email
+    const transporter = await getTransporter();
+    
+    const info = await transporter.sendMail({
+      from: '"LocalSM Hiring" <noreply@localsm.tech>',
+      to: email,
+      subject: "Your OTP for LocalSM Application",
+      text: `Your verification code is: ${otp}. It will expire in 10 minutes.`,
+      html: `<b>Your verification code is: ${otp}</b><br>It will expire in 10 minutes.`,
+    });
+
+    console.log(`[Email OTP] Sent to ${email}: ${otp}`);
+    if (!process.env.SMTP_HOST) {
+      console.log("[Email OTP] Preview URL: %s", nodemailer.getTestMessageUrl(info));
+    }
+
+    res.json({ success: true, message: 'OTP sent successfully' });
+  } catch (error) {
+    console.error('[Email OTP] Error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+router.post('/verify-email-otp', (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and OTP are required' });
+    }
+
+    const record = otpStore.get(email);
+    if (!record) {
+      return res.status(400).json({ error: 'OTP not requested or expired' });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(email);
+      return res.status(400).json({ error: 'OTP has expired' });
+    }
+
+    if (record.otp === otp) {
+      otpStore.delete(email);
+      return res.json({ success: true, message: 'OTP verified successfully' });
+    } else {
+      return res.status(400).json({ error: 'Invalid OTP' });
+    }
+  } catch (error) {
+    console.error('[Verify Email OTP] Error:', error);
+    res.status(500).json({ error: 'Failed to verify OTP' });
   }
 });
 
