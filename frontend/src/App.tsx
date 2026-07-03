@@ -1054,7 +1054,6 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
                     </span>
                     <input
                       type="file"
-                      required
                       accept=".pdf,.doc,.docx"
                       className="hidden"
                       onChange={(e) => {
