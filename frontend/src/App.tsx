@@ -942,11 +942,11 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStep("verification")}
+                    onClick={() => setStep("legal")}
                     className="w-2/3 py-3 rounded-full font-bold text-sm transition-all active:scale-95 hover:brightness-95 flex items-center justify-center gap-1"
                     style={{ backgroundColor: GOLD, color: TEXT_DARK }}
                   >
-                    Next: Email Verification <ArrowRight className="w-4 h-4" />
+                    Next <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </form>
@@ -977,7 +977,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
             ) : (
               <form onSubmit={handleLegalSubmit} className="space-y-6">
                 <h2 className="text-lg font-extrabold mb-1 pb-2 border-b" style={{ color: TEXT_DARK, borderColor: CREAM_BORDER }}>
-                  Step 3: Legal Notice
+                  Step 2: Legal Notice
                 </h2>
                 <p className="text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
                   Please read the following documents carefully before submitting your application.
