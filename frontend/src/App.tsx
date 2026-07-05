@@ -1315,12 +1315,14 @@ function HomePage({
   activeDept,
   setActiveDept,
   onJobClick,
-  jobs
+  jobs,
+  aboutStats
 }: {
   activeDept: DeptKey | string;
   setActiveDept: (d: DeptKey | string) => void;
   onJobClick: (title: string) => void;
   jobs: Job[];
+  aboutStats: any[];
 }) {
   const filteredJobs = activeDept === "all" ? jobs : jobs.filter((j) => j.dept === activeDept);
 
@@ -1624,6 +1626,7 @@ export default function App() {
             setActiveDept={setActiveDept}
             onJobClick={handleJobClick}
             jobs={backendJobs.length > 0 ? backendJobs : JOBS}
+            aboutStats={aboutStats}
           />
         )}
         {view === "detail" && selectedJob && (
