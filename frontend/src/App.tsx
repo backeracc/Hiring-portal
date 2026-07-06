@@ -1177,7 +1177,7 @@ function HomePage({
                       <span>/</span>
                       <span>{job.type}</span>
                       <span>/</span>
-                      <span>Unpaid</span>
+                      <span>{job.compensation}</span>
                       <span>/</span>
                       <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3" />{job.location}</span>
                     </div>
