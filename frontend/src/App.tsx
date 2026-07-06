@@ -265,7 +265,7 @@ function ApplyModal({ job, onClose }: { job: JobDetail; onClose: () => void }) {
     e.preventDefault();
 
     const formData = new FormData();
-    formData.append("jobId", (job as any)._id || (job as any).id || "");
+    formData.append("jobId", (job as any)._id || (job as any).id || job.title);
     formData.append("name", form.name);
     formData.append("email", form.email);
     formData.append("phone", form.phone);
@@ -349,23 +349,23 @@ function ApplyModal({ job, onClose }: { job: JobDetail; onClose: () => void }) {
           <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <Field label="Full Name">
+              <Field label="Full Name" optional>
                 <input type="text" placeholder="Your name" value={form.name} onChange={set("name")}
                   className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
               </Field>
-              <Field label="Email">
-                <input type="email" required placeholder="you@example.com" value={form.email} onChange={set("email")}
+              <Field label="Email" optional>
+                <input type="email" placeholder="you@example.com" value={form.email} onChange={set("email")}
                   className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
               </Field>
-              <Field label="Phone Number">
-                <input type="tel" required placeholder="+91 98765 43210" value={form.phone} onChange={set("phone")}
+              <Field label="Phone Number" optional>
+                <input type="tel" placeholder="+91 98765 43210" value={form.phone} onChange={set("phone")}
                   className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
               </Field>
-              <Field label="Location">
+              <Field label="Location" optional>
                 <input type="text" placeholder="City, Country" value={form.location} onChange={set("location")}
                   className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
               </Field>
-              <Field label="LinkedIn">
+              <Field label="LinkedIn" optional>
                 <input type="url" placeholder="linkedin.com/in/yourname" value={form.linkedin} onChange={set("linkedin")}
                   className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
               </Field>
@@ -376,13 +376,13 @@ function ApplyModal({ job, onClose }: { job: JobDetail; onClose: () => void }) {
             </div>
 
             {!isUnpaid && (
-              <Field label="Expected Salary">
+              <Field label="Expected Salary" optional>
                 <input type="text" placeholder="e.g. $80,000/yr" value={form.expectedSalary} onChange={set("expectedSalary")}
                   className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
               </Field>
             )}
 
-            <Field label="Resume">
+            <Field label="Resume" optional>
               <label
                 className="flex items-center gap-3 px-3.5 py-3 rounded-lg cursor-pointer"
                 style={{ border: `1px dashed ${CREAM_BORDER}` }}
@@ -393,7 +393,6 @@ function ApplyModal({ job, onClose }: { job: JobDetail; onClose: () => void }) {
                 </span>
                 <input
                   type="file"
-                  required
                   accept=".pdf,.doc,.docx"
                   className="hidden"
                   onChange={(e) => setFileName(e.target.files?.[0]?.name || "")}
@@ -401,7 +400,7 @@ function ApplyModal({ job, onClose }: { job: JobDetail; onClose: () => void }) {
               </label>
             </Field>
 
-            <Field label="Cover Letter">
+            <Field label="Cover Letter" optional>
               <textarea
                 rows={3}
                 placeholder="A few lines on why you'd be a great fit..."
@@ -417,12 +416,12 @@ function ApplyModal({ job, onClose }: { job: JobDetail; onClose: () => void }) {
             {job.customQuestions.length > 0 && (
               <div className="space-y-5 pt-1 border-t" style={{ borderColor: CREAM_BORDER }}>
                 {job.customQuestions.map((q, i) => (
-                  <Field key={i} label={q}>
+                  <Field key={i} label={q} optional>
                     <textarea
                       rows={2}
                       placeholder="Your answer..."
                       value={answers[i] ?? ""}
-                      required onChange={(e) => setAnswers({ ...answers, [i]: e.target.value })}
+                      onChange={(e) => setAnswers({ ...answers, [i]: e.target.value })}
                       className={`${fieldBase} resize-none`}
                       style={fieldStyle}
                       onFocus={focusField}
@@ -678,17 +677,12 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
     setStep("legal");
   };
 
-  const handleVerificationSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailOtpVerified) {
-      setSubmitError("Please verify your email first.");
-      return;
-    }
+  const submitApplication = async () => {
     setSubmitError("");
     setSubmitting(true);
 
     const formData = new FormData();
-    formData.append("jobId", (job as any)._id || (job as any).id || "");
+    formData.append("jobId", (job as any)._id || (job as any).id || job.title);
     formData.append("name", form.name);
     formData.append("email", email);
     formData.append("phone", phone);
@@ -704,7 +698,10 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
       answer: answers[i] || ""
     }));
     formData.append("customAnswers", JSON.stringify(customAnswersArray));
-    formData.append("resume", resumeFile!);
+    
+    if (resumeFile) {
+      formData.append("resume", resumeFile);
+    }
 
     try {
       const res = await fetch("/api/public/apply", {
@@ -732,7 +729,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
       return;
     }
     setLegalError("");
-    setStep("verification");
+    await submitApplication();
   };
 
   const setField = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -742,7 +739,6 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
   const steps = [
     { id: "details", label: "Application Details" },
     { id: "legal", label: "Legal Notice" },
-    { id: "verification", label: "Email Verification" },
   ];
 
   return (
@@ -769,7 +765,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
         <div className="flex items-center justify-between w-full mb-12 px-4">
           {steps.map((s, idx) => {
             const isActive = step === s.id;
-            const stepOrder = ["details", "legal", "verification"];
+            const stepOrder = ["details", "legal"];
             const currentIdx = stepOrder.indexOf(step as string);
             const sIdx = stepOrder.indexOf(s.id);
             const isCompleted = currentIdx > sIdx;
@@ -832,40 +828,27 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <Field label="Full Name">
-                    <input type="text" placeholder="Your name" value={form.name} required onChange={setField("name")}
+                  <Field label="Full Name" optional>
+                    <input type="text" placeholder="Your name" value={form.name} onChange={setField("name")}
                       className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
                   </Field>
-                  <Field label="Location">
-                    <input type="text" placeholder="City, Country" value={form.location} required onChange={setField("location")}
-                      className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
-                  </Field>
-                  
-                  {/* Phone Input (Moved from Verification step) */}
-                  <Field label="Phone Number">
-                    <input type="tel" placeholder="+1 234 567 8900" value={phone} required onChange={(e) => setPhone(e.target.value)}
+                  <Field label="Location" optional>
+                    <input type="text" placeholder="City, Country" value={form.location} onChange={setField("location")}
                       className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
                   </Field>
                   
-                  {/* Email Input */}
-                  <Field label="Email Address">
-                    <div className="flex flex-col gap-1">
-                      <input type="email" required disabled={emailOtpVerified} placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)}
-                        className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
-                      {emailOtpVerified ? (
-                        <p className="text-xs text-green-600 font-semibold">
-                          ✓ Verified
-                        </p>
-                      ) : (
-                        <p className="text-xs" style={{ color: TEXT_MUTED }}>
-                          <em>You will verify this email in the next step.</em>
-                        </p>
-                      )}
-                    </div>
+                  <Field label="Phone Number" optional>
+                    <input type="tel" placeholder="+1 234 567 8900" value={phone} onChange={(e) => setPhone(e.target.value)}
+                      className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
+                  </Field>
+                  
+                  <Field label="Email Address" optional>
+                    <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)}
+                      className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
                   </Field>
 
-                  <Field label="LinkedIn">
-                    <input type="url" placeholder="linkedin.com/in/yourname" value={form.linkedin} required onChange={setField("linkedin")}
+                  <Field label="LinkedIn" optional>
+                    <input type="url" placeholder="linkedin.com/in/yourname" value={form.linkedin} onChange={setField("linkedin")}
                       className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
                   </Field>
                   <Field label="Portfolio / GitHub" optional>
@@ -875,13 +858,13 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
                 </div>
 
                 {!isUnpaid && (
-                  <Field label="Expected Salary">
-                    <input type="text" placeholder="e.g. $80,000/yr" value={form.expectedSalary} required onChange={setField("expectedSalary")}
+                  <Field label="Expected Salary" optional>
+                    <input type="text" placeholder="e.g. $80,000/yr" value={form.expectedSalary} onChange={setField("expectedSalary")}
                       className={fieldBase} style={fieldStyle} onFocus={focusField} onBlur={blurField} />
                   </Field>
                 )}
 
-                <Field label="Resume">
+                <Field label="Resume" optional>
                   <label
                     className="flex items-center gap-3 px-3.5 py-3 rounded-lg cursor-pointer transition-colors hover:bg-gray-50"
                     style={{ border: `1px dashed ${CREAM_BORDER}` }}
@@ -905,12 +888,12 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
                   </label>
                 </Field>
 
-                <Field label="Cover Letter">
+                <Field label="Cover Letter" optional>
                   <textarea
                     rows={3}
                     placeholder="A few lines on why you'd be a great fit..."
                     value={form.coverLetter}
-                    required onChange={setField("coverLetter")}
+                    onChange={setField("coverLetter")}
                     className={`${fieldBase} resize-none`}
                     style={fieldStyle}
                     onFocus={focusField}
@@ -922,12 +905,12 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
                   <div className="space-y-5 pt-5 border-t" style={{ borderColor: CREAM_BORDER }}>
                     <h3 className="font-extrabold text-sm" style={{ color: TEXT_DARK }}>Additional Questions</h3>
                     {job.customQuestions.map((q, i) => (
-                      <Field key={i} label={q}>
+                      <Field key={i} label={q} optional>
                         <textarea
                           rows={2}
                           placeholder="Your answer..."
                           value={answers[i] ?? ""}
-                          required onChange={(e) => setAnswers({ ...answers, [i]: e.target.value })}
+                          onChange={(e) => setAnswers({ ...answers, [i]: e.target.value })}
                           className={`${fieldBase} resize-none`}
                           style={fieldStyle}
                           onFocus={focusField}
@@ -1058,114 +1041,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
           </div>
         )}
 
-        {/* Step 3: Verification */}
-        {step === "verification" && (
-          <div className="w-full p-10 rounded-2xl border bg-white" style={{ borderColor: CREAM_BORDER }}>
-            {submitted ? (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5" style={{ backgroundColor: CREAM }}>
-                  <CheckCircle2 className="w-9 h-9" style={{ color: GOLD_DARK }} />
-                </div>
-                <h3 className="text-xl font-extrabold mb-2" style={{ color: TEXT_DARK }}>Application Submitted!</h3>
-                <p className="text-sm max-w-sm leading-relaxed mb-6" style={{ color: TEXT_MUTED }}>
-                  Thank you for applying to <strong>{job.title}</strong>. Your verification phone number ({phone}) and email ({email}) have been recorded. We will review your application soon.
-                </p>
-                <button
-                  onClick={onBack}
-                  className="px-6 py-2.5 rounded-full text-sm font-semibold transition-all active:scale-95"
-                  style={{ backgroundColor: GOLD, color: TEXT_DARK }}
-                >
-                  Back to Roles
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleVerificationSubmit} className="space-y-6">
-                <h2 className="text-lg font-extrabold mb-1 pb-2 border-b" style={{ color: TEXT_DARK, borderColor: CREAM_BORDER }}>
-                  Step 3: Email Verification
-                </h2>
-                <p className="text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
-                  Please verify your email address to complete your application.
-                </p>
 
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input
-                      type="email"
-                      disabled
-                      value={email}
-                      className={fieldBase}
-                      style={{ ...fieldStyle, backgroundColor: "#f9fafb" }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSendEmailOtp}
-                      disabled={isSendingEmail || emailOtpVerified}
-                      className="px-6 py-2.5 rounded-lg text-sm font-bold transition-all active:scale-95 whitespace-nowrap"
-                      style={{
-                        backgroundColor: emailOtpVerified ? "#10B981" : CREAM,
-                        color: emailOtpVerified ? "#fff" : TEXT_DARK,
-                        border: `1px solid ${emailOtpVerified ? "#10B981" : CREAM_BORDER}`,
-                      }}
-                    >
-                      {emailOtpVerified
-                        ? "Verified"
-                        : isSendingEmail
-                        ? "Sending..."
-                        : emailOtpSent
-                        ? "Resend OTP"
-                        : "Send OTP"}
-                    </button>
-                  </div>
-                  {emailOtpSent && !emailOtpVerified && (
-                    <div className="flex flex-col sm:flex-row gap-3 mt-3">
-                      <input
-                        type="text"
-                        placeholder="Enter Email OTP"
-                        value={emailOtp}
-                        onChange={(e) => setEmailOtp(e.target.value)}
-                        className={fieldBase}
-                        style={fieldStyle}
-                      />
-                      <button
-                        type="button"
-                        onClick={handleVerifyEmailOtp}
-                        className="px-6 py-2.5 rounded-lg text-sm font-bold transition-all active:scale-95 whitespace-nowrap"
-                        style={{ backgroundColor: GOLD_DARK, color: "#fff" }}
-                      >
-                        Verify OTP
-                      </button>
-                    </div>
-                  )}
-                  {emailOtpError && <p className="text-sm font-semibold text-red-600 mt-2">{emailOtpError}</p>}
-                </div>
-                
-                {submitError && (
-                  <p className="text-sm font-semibold text-red-600">{submitError}</p>
-                )}
-                
-                <div className="flex gap-3 mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setStep("legal")}
-                    disabled={submitting}
-                    className="w-1/3 py-3 rounded-full font-bold text-sm transition-all active:scale-95 hover:bg-gray-50 border flex items-center justify-center gap-1"
-                    style={{ borderColor: CREAM_BORDER, color: TEXT_DARK }}
-                  >
-                    <ArrowRight className="w-4 h-4 rotate-180" /> Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting || !emailOtpVerified}
-                    className="w-2/3 py-3 rounded-full font-bold text-sm transition-all active:scale-95 hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: GOLD, color: TEXT_DARK }}
-                  >
-                    {submitting ? "Submitting Application..." : "Submit Application"}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
 
       </div>
     </div>
@@ -1196,7 +1072,7 @@ function HomePage({
           <div>
             <h1 className="text-5xl sm:text-6xl font-extrabold leading-[1.08] mb-5" style={{ color: TEXT_DARK }}>
               Work with<br />
-              <span style={{ fontFamily: "'EB Garamond', serif", color: GOLD_DARK, fontWeight: 400 }}>Us.</span>
+              <span style={{ fontFamily: "'Italiana', serif", color: GOLD_DARK, fontWeight: 400 }}>Us.</span>
             </h1>
             <p className="text-base sm:text-lg leading-relaxed mb-8 max-w-md" style={{ color: TEXT_MUTED }}>
               Find jobs that match your interests and abilities with a minimal, modern hiring experience.

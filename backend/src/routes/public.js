@@ -147,7 +147,11 @@ router.post('/apply', upload.single('resume'), async (req, res) => {
       job = await Job.findOne({ id: jobId });
     }
     if (!job) {
-      return res.status(404).json({ error: 'Job not found. Please refresh and try again.' });
+      job = await Job.findOne({ title: jobId });
+    }
+    if (!job) {
+      // Fallback for static frontend jobs without a database entry
+      job = { id: jobId, title: jobId };
     }
 
     // Parse custom answers
