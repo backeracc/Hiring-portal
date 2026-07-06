@@ -740,9 +740,9 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
   };
 
   const steps = [
-    { id: \"details\", label: \"Application Details\" },
-    { id: \"legal\", label: \"Legal Notice\" },
-    { id: \"verification\", label: \"Email Verification\" },
+    { id: "details", label: "Application Details" },
+    { id: "legal", label: "Legal Notice" },
+    { id: "verification", label: "Email Verification" },
   ];
 
   return (
@@ -769,7 +769,7 @@ function SelectionProcessPage({ job, onBack }: SelectionProcessPageProps) {
         <div className="flex items-center justify-between w-full mb-12 px-4">
           {steps.map((s, idx) => {
             const isActive = step === s.id;
-            const stepOrder = [\"details\", \"legal\", \"verification\"];
+            const stepOrder = ["details", "legal", "verification"];
             const currentIdx = stepOrder.indexOf(step as string);
             const sIdx = stepOrder.indexOf(s.id);
             const isCompleted = currentIdx > sIdx;
