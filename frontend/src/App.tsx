@@ -1072,7 +1072,7 @@ function HomePage({
           <div>
             <h1 className="text-5xl sm:text-6xl font-extrabold leading-[1.08] mb-5" style={{ color: TEXT_DARK }}>
               Work with<br />
-              <span style={{ fontFamily: "'Italiana', serif", color: GOLD_DARK, fontWeight: 400 }}>Us.</span>
+              <span style={{ fontFamily: "'Lora', serif", color: GOLD_DARK }}>Us.</span>
             </h1>
             <p className="text-base sm:text-lg leading-relaxed mb-8 max-w-md" style={{ color: TEXT_MUTED }}>
               Find jobs that match your interests and abilities with a minimal, modern hiring experience.
@@ -1102,7 +1102,7 @@ function HomePage({
       <section id="why-join" className="scroll-mt-20 py-20 border-t" style={{ backgroundColor: "#fff", borderColor: CREAM_BORDER }}>
         <div className="max-w-6xl mx-auto px-6">
           <div className="mb-12">
-            <h2 className="text-3xl sm:text-4xl font-normal mb-3" style={{ fontFamily: "'Italiana', serif", color: TEXT_DARK }}>Why join LocalSM</h2>
+            <h2 className="text-3xl sm:text-4xl font-extrabold mb-3" style={{ color: TEXT_DARK }}>Why join LocalSM</h2>
             <p className="max-w-xl leading-relaxed" style={{ color: TEXT_MUTED }}>
               Work with a small, focused team building products that serve our city. Internships at LocalSM are hands-on, mentored, and designed to grow your career.
             </p>
