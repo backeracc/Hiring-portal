@@ -1102,7 +1102,7 @@ function HomePage({
       <section id="why-join" className="scroll-mt-20 py-20 border-t" style={{ backgroundColor: "#fff", borderColor: CREAM_BORDER }}>
         <div className="max-w-6xl mx-auto px-6">
           <div className="mb-12">
-            <h2 className="text-3xl sm:text-4xl font-extrabold mb-3" style={{ color: TEXT_DARK }}>Why Join LocalSM?</h2>
+            <h2 className="text-3xl sm:text-4xl font-normal mb-3" style={{ fontFamily: "'Italiana', serif", color: TEXT_DARK }}>Why join LocalSM</h2>
             <p className="max-w-xl leading-relaxed" style={{ color: TEXT_MUTED }}>
               Work with a small, focused team building products that serve our city. Internships at LocalSM are hands-on, mentored, and designed to grow your career.
             </p>
@@ -1345,7 +1345,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen font-sans" style={{ backgroundColor: "#fff", color: TEXT_DARK }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#fff", color: TEXT_DARK }}>
       <Navbar
         scrolled={scrolled}
         onHome={handleHome}
