@@ -19,6 +19,7 @@ const allowedOrigins = [
   'http://localsm.tech',
   'https://localsm.tech',
   'https://www.localsm.tech',
+  'https://admin-panel-navy-zeta.vercel.app',
   'https://admin-panel-local-sm.vercel.app',
   'https://hiring-portal-rosy.vercel.app',
   'https://test-final-hiring-portal.vercel.app',
